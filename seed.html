@@ -7,7 +7,8 @@
     <script type="importmap">
     {
       "imports": {
-        "firebase/": "https://aistudiocdn.com/firebase@^12.5.0/"
+        "firebase/app": "https://aistudiocdn.com/firebase@^12.5.0/app",
+        "firebase/firestore": "https://aistudiocdn.com/firebase@^12.5.0/firestore"
       }
     }
     </script>
@@ -29,9 +30,8 @@
     </div>
 
     <script type="module">
-        // This script now directly imports the seedDatabase function, 
-        // which will use the updated firebaseConfig.ts for its connection.
-        import { seedDatabase } from './services/seedDatabase.ts';
+        import { initializeApp } from "firebase/app";
+        import { getFirestore, collection, writeBatch, doc, getDocs, Timestamp } from 'firebase/firestore';
 
         const seedButton = document.getElementById('seedButton');
         const output = document.getElementById('output');
@@ -44,11 +44,107 @@
             }
         }
 
-        if (seedButton) {
+        // =================================================================================
+        // PASTE YOUR FIREBASE CONFIGURATION HERE
+        // =================================================================================
+        // Copy this object from your `firebaseConfig.ts` file on GitHub
+        const firebaseConfig = {
+          apiKey: "AIzaSyBOFslmqlDOZScv5U4qZ-_zcufzTO-LI-E",
+          authDomain: "flowapp-03.firebaseapp.com",
+          projectId: "flowapp-03",
+          storageBucket: "flowapp-03.firebasestorage.app",
+          messagingSenderId: "1099349104193",
+          appId: "1:1099349104193:web:305ef5be67118740f618c0",
+          measurementId: "G-6TMZ2D08MJ"
+        };
+        // =================================================================================
+        
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            log('Firebase connection configured.');
+        } catch(e) {
+            log('Error: Could not initialize Firebase. Have you pasted your firebaseConfig object correctly?');
+            console.error(e);
+        }
+
+        // --- All data is now included directly in this file ---
+        const { USERS, VENDORS, RESTAURANTS, ORDERS, BOARD_TEMPLATES, MENU_TEMPLATES, MENU_ITEM_TEMPLATES } = (function() {
+            const UserRole = { Consumer: 'Consumer', Vendor: 'Vendor', SuperAdmin: 'SuperAdmin', RestaurantAdmin: 'RestaurantAdmin' };
+            const MediaType = { Video: 'video', Audio: 'audio', Text: 'text', Link: 'link', Image: 'image' };
+            const PaymentMethod = { CreditCard: 'Credit Card', PayPal: 'PayPal', Bizum: 'Bizum', Stripe: 'Stripe', Cash: 'Cash' };
+            
+            const USERS_DATA = [
+              { id: '2', name: 'Burger Queen Admin', username: 'vendor1', password: 'password', role: UserRole.Vendor, vendorId: '1' },
+              { id: '3', name: 'Pizza Palace Admin', username: 'vendor2', password: 'password', role: UserRole.Vendor, vendorId: '2' },
+              { id: '4', name: 'Super Admin', username: 'superadmin', password: 'password', role: UserRole.SuperAdmin },
+              { id: '5', name: 'Burger Restaurant Manager', username: 'restadmin1', password: 'password', role: UserRole.RestaurantAdmin, vendorId: '1', restaurantId: '1', permissions: { canViewAnalytics: true, canManageMenu: true, canManageSettings: false, canManageOrders: true, }, permissionSchedule: { monday: { isActive: true, startTime: '00:00', endTime: '23:59' }, tuesday: { isActive: true, startTime: '00:00', endTime: '23:59' }, wednesday: { isActive: true, startTime: '00:00', endTime: '23:59' }, thursday: { isActive: true, startTime: '00:00', endTime: '23:59' }, friday: { isActive: true, startTime: '00:00', endTime: '23:59' }, saturday: { isActive: true, startTime: '00:00', endTime: '23:59' }, sunday: { isActive: true, startTime: '00:00', endTime: '23:59' }, } },
+            ];
+            const VENDORS_DATA = [ { id: '1', name: 'Burger Queen Group' }, { id: '2', name: 'Pizza Palace Inc.' }, ];
+            const ALLERGENS = [ { id: 'gf', name: 'Gluten-Free' }, { id: 'v', name: 'Vegetarian' }, { id: 's', name: 'Spicy' }, ];
+            const INTOLERANCES = [ { id: 'lactose', name: 'Lactose', icon: 'LactoseIcon' }, { id: 'nuts', name: 'Nuts', icon: 'NutsIcon' }, ];
+            const MENU_ITEM_TEMPLATES_DATA = [ { id: '101', vendorId: '1', name: 'Classic Cheeseburger', description: 'A timeless classic with a juicy beef patty, melted cheddar, pickles, onions, ketchup, and mustard on a toasted bun.', price: 8.99, imageUrl: 'https://picsum.photos/400/300?random=21', composition: ['Beef Patty (1/3 lb)', 'Cheddar Cheese Slice', 'Dill Pickles', 'White Onion', 'Toasted Sesame Bun'], intolerances: [INTOLERANCES[0]] }, { id: '102', vendorId: '1', name: 'Bacon Deluxe', description: 'Our classic burger topped with crispy bacon and our special deluxe sauce.', price: 10.99, imageUrl: 'https://picsum.photos/400/300?random=22', composition: ['Beef Patty (1/3 lb)', 'Crispy Bacon (2 strips)', 'Cheddar Cheese Slice', 'Deluxe Sauce'], discount: { percentage: 10, showToConsumer: true } }, { id: '103', vendorId: '1', name: 'Spicy Jalapeño Burger', description: 'For those who like it hot! Featuring pepper jack cheese and fresh jalapeños.', price: 9.99, imageUrl: 'https://picsum.photos/400/300?random=23', composition: ['Beef Patty (1/3 lb)', 'Pepper Jack Cheese', 'Fresh Jalapeños', 'Spicy Mayo'], allergens: [ALLERGENS[2]] }, { id: '104', vendorId: '1', name: 'Crispy Fries', description: 'Golden, crispy, and perfectly salted.', price: 3.50, imageUrl: 'https://picsum.photos/400/300?random=24', composition: ['Potatoes', 'Canola Oil', 'Salt'], allergens: [ALLERGENS[0], ALLERGENS[1]] }, { id: '201', vendorId: '2', name: 'Margherita Pizza', description: 'Classic pizza with fresh mozzarella, San Marzano tomatoes, and basil.', price: 14.00, imageUrl: 'https://picsum.photos/400/300?random=31', composition: ['Fresh Mozzarella', 'San Marzano Tomato Sauce', 'Fresh Basil', 'Olive Oil'], allergens: [ALLERGENS[1]], intolerances: [INTOLERANCES[0]] }, { id: '202', vendorId: '2', name: 'Pepperoni Passion', description: 'Loaded with spicy pepperoni and gooey mozzarella.', price: 16.50, imageUrl: 'https://picsum.photos/400/300?random=32', composition: ['Spicy Pepperoni', 'Mozzarella', 'Tomato Sauce'] }, { id: '203', vendorId: '2', name: 'Veggie Supreme', description: 'A garden on a pizza! Bell peppers, onions, olives, and mushrooms.', price: 15.50, imageUrl: 'https://picsum.photos/400/300?random=33', composition: ['Bell Peppers', 'Red Onions', 'Black Olives', 'Mushrooms', 'Mozzarella'], allergens: [ALLERGENS[1]] }, { id: '204', vendorId: '2', name: 'Garlic Knots', description: 'Warm, buttery, and garlicky. Perfect for dipping.', price: 5.00, imageUrl: 'https://picsum.photos/400/300?random=34', composition: ['Dough', 'Garlic Butter', 'Parsley'], allergens: [ALLERGENS[1]] }, ];
+            const MENU_TEMPLATES_DATA = [ { id: '1', vendorId: '1', name: 'Main Menu (Burgers)', sections: [ { id: 'sec-1-1', title: 'Signature Burgers', itemIds: ['101', '102', '103'] }, { id: 'sec-1-2', title: 'Sides', itemIds: ['104'] } ] }, { id: '2', vendorId: '2', name: 'Main Menu (Pizza)', sections: [ { id: 'sec-2-1', title: 'Pizzas', itemIds: ['201', '202', '203'] }, { id: 'sec-2-2', title: 'Starters', itemIds: ['204'] } ] }, ];
+            const BOARD_TEMPLATES_DATA = [ { id: '1', vendorId: '1', name: 'Standard Burger Workflow', config: { statuses: [ { id: 'pending', label: 'Pending', color: '#fb923c' }, { id: 'accepted', label: 'Accepted', color: '#3b82f6' }, { id: 'in-progress', label: 'In Progress', color: '#a855f7' }, { id: 'ready-for-pickup', label: 'Ready for Pickup', color: '#facc15' }, { id: 'completed', label: 'Completed', color: '#22c55e' }, { id: 'rejected', label: 'Rejected', color: '#ef4444' }, ], columns: [ { id: 'col-1', title: 'New Orders', statusIds: ['pending'], icon: 'ClipboardListIcon', titleColor: '#374151', columnColor: '#F3F4F6' }, { id: 'col-2', title: 'In Progress', statusIds: ['accepted', 'in-progress'], icon: 'ChefHatIcon', titleColor: '#374151', columnColor: '#F3F4F6' }, { id: 'col-3', title: 'Ready for Pickup', statusIds: ['ready-for-pickup'], icon: 'ShoppingBagIcon', titleColor: '#374151', columnColor: '#F3F4F6' }, ], rejectionReasons: [ { id: 'reason-1', message: 'Restaurant is too busy to accept new orders.' }, { id: 'reason-2', message: 'One or more items are out of stock.' }, { id: 'reason-3', message: 'Closing soon and cannot fulfill the order in time.' }, ], statusTransitions: { 'pending': ['accepted', 'rejected'], 'accepted': ['in-progress'], 'in-progress': ['ready-for-pickup'], 'ready-for-pickup': ['completed'], 'completed': [], 'rejected': [], }, } }, { id: '2', vendorId: '2', name: 'Standard Pizza Workflow', config: { statuses: [ { id: 'pending', label: 'Pending', color: '#fb923c' }, { id: 'accepted', label: 'Accepted', color: '#3b82f6' }, { id: 'in-progress', label: 'In Progress', color: '#a855f7' }, { id: 'ready-for-pickup', label: 'Ready for Pickup', color: '#facc15' }, { id: 'completed', label: 'Completed', color: '#22c55e' }, { id: 'rejected', label: 'Rejected', color: '#ef4444' }, ], columns: [ { id: 'col-1', title: 'New Orders', statusIds: ['pending'], icon: 'ClipboardListIcon', titleColor: '#374151', columnColor: '#F3F4F6' }, { id: 'col-2', title: 'In Progress', statusIds: ['accepted', 'in-progress'], icon: 'ChefHatIcon', titleColor: '#374151', columnColor: '#F3F4F6' }, { id: 'col-3', title: 'Ready for Pickup', statusIds: ['ready-for-pickup'], icon: 'ShoppingBagIcon', titleColor: '#374151', columnColor: '#F3F4F6' }, ], rejectionReasons: [ { id: 'reason-1', message: 'Restaurant is too busy to accept new orders.' }, { id: 'reason-2', message: 'One or more items are out of stock.' }, { id: 'reason-3', message: 'Closing soon and cannot fulfill the order in time.' }, ], statusTransitions: { 'pending': ['accepted', 'rejected'], 'accepted': ['in-progress'], 'in-progress': ['ready-for-pickup'], 'ready-for-pickup': ['completed'], 'completed': [], 'rejected': [], }, } } ];
+            const RESTAURANTS_DATA = [ { id: '1', vendorId: '1', name: 'Burger Queen', description: 'Home of the Flame-Grilled Masterpiece. We serve the juiciest burgers in town.', bannerUrl: 'https://picsum.photos/1200/400?random=1', contact: { phone: '555-1234', email: 'contact@burgerqueen.com', address: '123 Burger Lane, Foodville' }, openingHours: { monday: { isOpen: true, open: '11:00', close: '22:00' }, tuesday: { isOpen: true, open: '11:00', close: '22:00' }, wednesday: { isOpen: true, open: '11:00', close: '22:00' }, thursday: { isOpen: true, open: '11:00', close: '22:00' }, friday: { isOpen: true, open: '11:00', close: '23:00' }, saturday: { isOpen: true, open: '11:00', close: '23:00' }, sunday: { isOpen: false, open: '11:00', close: '22:00' }, }, paymentMethods: [PaymentMethod.CreditCard, PaymentMethod.Cash, PaymentMethod.Stripe], branding: { primaryColor: '#D97706', logoUrl: 'https://picsum.photos/200/200?random=11' }, media: [ { id: '1', type: MediaType.Video, title: 'How We Make Our Famous Burgers', source: 'https://www.w3schools.com/html/mov_bbb.mp4', description: 'A quick look behind the scenes at Burger Queen.' }, { id: '2', type: MediaType.Text, title: 'Employee of the Month!', source: 'Congrats to Sarah J. for her amazing work this month!', description: 'Celebrating our amazing team.' }, ], boardTemplateId: '1', assignedMenuTemplateIds: ['1'], }, { id: '2', vendorId: '2', name: 'Pizza Palace', description: 'Authentic Italian pizza with the freshest ingredients. A slice of heaven!', bannerUrl: 'https://picsum.photos/1200/400?random=2', contact: { phone: '555-5678', email: 'ciao@pizzapalace.com', address: '456 Pizza Plaza, Foodville' }, openingHours: { monday: { isOpen: false, open: '12:00', close: '23:00' }, tuesday: { isOpen: true, open: '12:00', close: '23:00' }, wednesday: { isOpen: true, open: '12:00', close: '23:00' }, thursday: { isOpen: true, open: '12:00', close: '23:00' }, friday: { isOpen: true, open: '12:00', close: '00:00' }, saturday: { isOpen: true, open: '12:00', close: '00:00' }, sunday: { isOpen: true, open: '12:00', close: '23:00' }, }, paymentMethods: [PaymentMethod.CreditCard, PaymentMethod.PayPal, PaymentMethod.Bizum, PaymentMethod.Cash], branding: { primaryColor: '#DC2626', logoUrl: 'https://picsum.photos/200/200?random=12' }, media: [ { id: '3', type: MediaType.Audio, title: 'Message from the Chef', source: 'https://www.w3schools.com/html/horse.ogg', description: 'Listen to Chef Giovanni talk about his passion for pizza.' }, { id: '4', type: MediaType.Link, title: 'Catering Services', source: '#', description: 'Planning a party? Click to learn more.' }, ], boardTemplateId: '2', assignedMenuTemplateIds: ['2'], }, ];
+            const menuItemsWithRestaurant = MENU_ITEM_TEMPLATES_DATA.map(m => ({ ...m, restaurantId: RESTAURANTS_DATA.find(r => r.vendorId === m.vendorId).id }));
+            const calculateOrderTotals = (items) => { const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0); const taxes = subtotal * 0.08; const deliveryFee = 5.00; const total = subtotal + taxes + deliveryFee; return { subtotal, taxes, deliveryFee, total }; };
+            const ORDERS_DATA = [ { id: 'ORD-123', restaurantId: '1', items: [{...menuItemsWithRestaurant[0], quantity: 1, removedIngredients: ['White Onion']}, {...menuItemsWithRestaurant[3], quantity: 1}], ...calculateOrderTotals([{...menuItemsWithRestaurant[0], quantity: 1}, {...menuItemsWithRestaurant[3], quantity: 1}]), status: 'pending', orderTime: new Date(Date.now() - 5 * 60000), lastUpdateTime: new Date(Date.now() - 5 * 60000) }, { id: 'ORD-124', restaurantId: '1', items: [{...menuItemsWithRestaurant[1], quantity: 2}], ...calculateOrderTotals([{...menuItemsWithRestaurant[1], quantity: 2}]), status: 'in-progress', orderTime: new Date(Date.now() - 10 * 60000), lastUpdateTime: new Date(Date.now() - 2 * 60000), processedByUserId: '5' }, { id: 'ORD-125', restaurantId: '2', items: [{...menuItemsWithRestaurant[5], quantity: 1}], ...calculateOrderTotals([{...menuItemsWithRestaurant[5], quantity: 1}]), status: 'ready-for-pickup', orderTime: new Date(Date.now() - 15 * 60000), lastUpdateTime: new Date(Date.now() - 1 * 60000) }, { id: 'ORD-126', restaurantId: '1', items: [{...menuItemsWithRestaurant[2], quantity: 1}], ...calculateOrderTotals([{...menuItemsWithRestaurant[2], quantity: 1}]), status: 'accepted', orderTime: new Date(Date.now() - 8 * 60000), lastUpdateTime: new Date(Date.now() - 4 * 60000), processedByUserId: '5' }, { id: 'ORD-127', restaurantId: '1', items: [{...menuItemsWithRestaurant[0], quantity: 1}], ...calculateOrderTotals([{...menuItemsWithRestaurant[0], quantity: 1}]), status: 'completed', orderTime: new Date(Date.now() - 30 * 60000), lastUpdateTime: new Date(Date.now() - 10 * 60000), completionTime: 20, processedByUserId: '5' }, { id: 'ORD-128', restaurantId: '2', items: [{...menuItemsWithRestaurant[4], quantity: 2}], ...calculateOrderTotals([{...menuItemsWithRestaurant[4], quantity: 2}]), status: 'completed', orderTime: new Date(Date.now() - 45 * 60000), lastUpdateTime: new Date(Date.now() - 25 * 60000), completionTime: 20 }, { id: 'ORD-129', restaurantId: '1', items: [{...menuItemsWithRestaurant[3], quantity: 3}], ...calculateOrderTotals([{...menuItemsWithRestaurant[3], quantity: 3}]), status: 'completed', orderTime: new Date(Date.now() - 60 * 60000), lastUpdateTime: new Date(Date.now() - 48 * 60000), completionTime: 12, processedByUserId: '5' }, { id: 'ORD-130', restaurantId: '1', items: [{...menuItemsWithRestaurant[1], quantity: 1}], ...calculateOrderTotals([{...menuItemsWithRestaurant[1], quantity: 1}]), status: 'rejected', orderTime: new Date(Date.now() - 5 * 60000), lastUpdateTime: new Date(Date.now() - 3 * 60000), rejectionReason: 'Restaurant is too busy to accept new orders.', processedByUserId: '5' }, ];
+            return { USERS: USERS_DATA, VENDORS: VENDORS_DATA, RESTAURANTS: RESTAURANTS_DATA, ORDERS: ORDERS_DATA, BOARD_TEMPLATES: BOARD_TEMPLATES_DATA, MENU_TEMPLATES: MENU_TEMPLATES_DATA, MENU_ITEM_TEMPLATES: MENU_ITEM_TEMPLATES_DATA };
+        })();
+        
+        // --- The main seedDatabase function ---
+        const COLLECTIONS = [ 'users', 'vendors', 'restaurants', 'orders', 'boardTemplates', 'menuTemplates', 'menuItemTemplates' ];
+        
+        async function seedDatabase() {
+            log('Starting database seed...');
+            const batch = writeBatch(db);
+
+            log('Clearing existing data...');
+            for (const collectionName of COLLECTIONS) {
+                const querySnapshot = await getDocs(collection(db, collectionName));
+                querySnapshot.forEach((doc) => batch.delete(doc.ref));
+                log(`Marked ${querySnapshot.size} documents for deletion from ${collectionName}.`);
+            }
+            await batch.commit();
+            log('Existing data cleared.');
+
+            const seedBatch = writeBatch(db);
+
+            VENDORS.forEach(vendor => seedBatch.set(doc(db, 'vendors', vendor.id), vendor));
+            log(`Seeding ${VENDORS.length} vendors...`);
+
+            USERS.forEach(user => seedBatch.set(doc(db, 'users', user.id), user));
+            log(`Seeding ${USERS.length} users...`);
+
+            RESTAURANTS.forEach(restaurant => seedBatch.set(doc(db, 'restaurants', restaurant.id), restaurant));
+            log(`Seeding ${RESTAURANTS.length} restaurants...`);
+            
+            BOARD_TEMPLATES.forEach(template => seedBatch.set(doc(db, 'boardTemplates', template.id), template));
+            log(`Seeding ${BOARD_TEMPLATES.length} board templates...`);
+
+            MENU_ITEM_TEMPLATES.forEach(item => seedBatch.set(doc(db, 'menuItemTemplates', item.id), item));
+            log(`Seeding ${MENU_ITEM_TEMPLATES.length} menu item templates...`);
+
+            MENU_TEMPLATES.forEach(template => seedBatch.set(doc(db, 'menuTemplates', template.id), template));
+            log(`Seeding ${MENU_TEMPLATES.length} menu templates...`);
+
+            ORDERS.forEach(order => {
+                const orderDataForFirestore = { ...order, orderTime: Timestamp.fromDate(new Date(order.orderTime)), lastUpdateTime: Timestamp.fromDate(new Date(order.lastUpdateTime)), };
+                seedBatch.set(doc(db, 'orders', order.id), orderDataForFirestore);
+            });
+            log(`Seeding ${ORDERS.length} orders...`);
+
+            await seedBatch.commit();
+            log('Database seeded successfully!');
+            return `Database seeded successfully with ${VENDORS.length} vendors, ${USERS.length} users, ${RESTAURANTS.length} restaurants, and ${ORDERS.length} orders.`;
+        };
+
+        // --- Attach event listener ---
+        if (seedButton && db) {
             seedButton.addEventListener('click', async () => {
-                if (!confirm("Are you sure you want to delete all existing data and seed the database? This cannot be undone.")) {
-                    return;
-                }
+                if (!confirm("Are you sure you want to delete all existing data and seed the database? This cannot be undone.")) return;
 
                 seedButton.disabled = true;
                 seedButton.textContent = 'Seeding...';
@@ -61,10 +157,6 @@
                     log(result);
                 } catch (error) {
                     log('\n--- AN ERROR OCCURRED ---');
-                    log('Please check the developer console for more details.');
-                    log('Common issues:');
-                    log('- Make sure you have pasted your credentials into firebaseConfig.ts.');
-                    log('- Ensure your Firestore security rules are set to test mode to allow writes.');
                     log(error.message);
                     console.error(error);
                 } finally {
@@ -72,11 +164,10 @@
                     seedButton.textContent = 'Seed Database';
                 }
             });
+            log('Ready to seed.');
+        } else if (!db) {
+            log('Error: Firebase is not connected. Please check your credentials in the script.');
         }
-
-        log('Ready to seed.');
-        log('Please ensure you have updated firebaseConfig.ts with your credentials from the Firebase console.');
-
     </script>
 </body>
 </html>
